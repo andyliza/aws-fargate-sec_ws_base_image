@@ -1,0 +1,39 @@
+version: 0.2
+
+env:
+  parameter-store:
+    SNYK_AUTH_TOKEN: "snykAuthToken"
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - $(aws ecr get-login --region ap-southeast-1 --no-include-email)
+      - REPOSITORY_URI=394576591249.dkr.ecr.ap-southeast-1.amazonaws.com/ws-base-image
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - PWD=$(pwd)
+      - PWDUTILS=$(pwd)
+      - curl -Lo ./snyk "https://github.com/snyk/snyk/releases/download/v1.210.0/snyk-linux"
+      - chmod -R +x ./snyk
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build --build-arg snyk_auth_token=$SNYK_AUTH_TOKEN -t $REPOSITORY_URI:latest .
+      - LOC=$(pwd)
+      - $PWDUTILS/snyk auth $SNYK_AUTH_TOKEN
+      - $PWDUTILS/snyk test --severity-threshold=high --fail-on=patchable --policy-path=$LOC/policy.snyk --docker $REPOSITORY_URI:latest
+      - $PWDUTILS/snyk monitor --docker $REPOSITORY_URI:latest
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+artifacts:
+  files:
+    - '**/*'
+
