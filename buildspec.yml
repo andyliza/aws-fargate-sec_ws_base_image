@@ -9,8 +9,9 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws --version
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
       - $(aws ecr get-login --region ap-southeast-1 --no-include-email)
-      - REPOSITORY_URI=394576591249.dkr.ecr.ap-southeast-1.amazonaws.com/ws-base-image
+      - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.ap-southeast-1.amazonaws.com/ws-base-image
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
       - PWD=$(pwd)
